@@ -1,0 +1,27 @@
+name: Yemekhane gunluk menu
+
+on:
+  schedule:
+    # UTC 05:50 = Türkiye saatiyle 08:50. GitHub zamanlaması birkaç dakika
+    # gecikebildiği için 09:00 yerine biraz erken ayarlandı.
+    - cron: "50 5 * * *"
+  workflow_dispatch: {}   # "Run workflow" ile elle test
+
+jobs:
+  menu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Menüyü gönder
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          MENU_LOCATION_ID: ${{ vars.MENU_LOCATION_ID }}
+          MENU_MEALS: ${{ vars.MENU_MEALS }}
+        run: python -u menu_bot.py
