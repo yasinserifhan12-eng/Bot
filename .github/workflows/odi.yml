@@ -1,0 +1,50 @@
+name: Odi askida yemek takibi
+
+# Her başlatılan iş açık kalır ve 21:00'e (ya da ~6 saat dolana) kadar
+# HER DAKİKA kontrol eder. Aşağıdaki 5 dakikalık tetikleyiciler yedektir:
+# bir iş zaten çalışıyorsa yenisi sırada bekler, iş biterse/çökerse devralır.
+on:
+  schedule:
+    # UTC 08:00-17:55 = Türkiye saatiyle 11:00-20:55
+    - cron: "*/5 8-17 * * *"
+  workflow_dispatch: {}   # "Run workflow" ile elle test (10 dk çalışır)
+
+concurrency:
+  group: odi-bot
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 358
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Önceki işin durumunu geri yükle (aynı bildirimi tekrar atmamak için).
+      # Burada şifre/oturum SAKLANMAZ, sadece restoran durumları.
+      - uses: actions/cache/restore@v4
+        with:
+          path: .state
+          key: odi-state-${{ github.run_id }}
+          restore-keys: odi-state-
+
+      - name: Takip et
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          ODI_EMAIL: ${{ secrets.ODI_EMAIL }}
+          ODI_PASSWORD: ${{ secrets.ODI_PASSWORD }}
+          RESTAURANTS: ${{ vars.RESTAURANTS }}
+          CITY_ID: ${{ vars.CITY_ID }}
+          FORCE: ${{ github.event_name == 'workflow_dispatch' && '1' || '0' }}
+        run: python odi_bot.py
+
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: .state
+          key: odi-state-${{ github.run_id }}
