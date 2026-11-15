@@ -41,7 +41,7 @@ jobs:
           RESTAURANTS: ${{ vars.RESTAURANTS }}
           CITY_ID: ${{ vars.CITY_ID }}
           FORCE: ${{ github.event_name == 'workflow_dispatch' && '1' || '0' }}
-        run: python odi_bot.py
+        run: python -u odi_bot.py
 
       - uses: actions/cache/save@v4
         if: always()
