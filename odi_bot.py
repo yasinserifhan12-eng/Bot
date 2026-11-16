@@ -184,6 +184,21 @@ def save_state(state):
         json.dump(keep, f)
 
 
+RUN_STARTED = datetime.now(TZ)
+
+
+def wait_for_start():
+    """GitHub işi erken başlattıysa (en çok 60 dk önce) START_HOUR'a kadar bekler."""
+    if env("FORCE") == "1" or env("DRY_RUN") == "1":
+        return
+    n = now_tr()
+    start = n.replace(hour=int(env("START_HOUR", "11")), minute=0, second=0, microsecond=0)
+    wait = (start - n).total_seconds()
+    if 0 < wait <= 60 * 60:
+        print(f"{start.strftime('%H:%M')} bekleniyor ({int(wait)} sn)...")
+        time.sleep(wait)
+
+
 def window_end():
     n = now_tr()
     start_h, end_h = int(env("START_HOUR", "11")), int(env("END_HOUR", "21"))
@@ -192,7 +207,8 @@ def window_end():
     if not (start_h <= n.hour < end_h):
         return None
     end = n.replace(hour=end_h, minute=0, second=0, microsecond=0)
-    return min(end, n + timedelta(minutes=MAX_RUN_MINUTES))
+    # 6 saatlik GitHub sınırı işin başladığı andan sayılır (bekleme dahil).
+    return min(end, RUN_STARTED + timedelta(minutes=MAX_RUN_MINUTES))
 
 
 def check_once(odi, targets, state, reply=False):
@@ -204,7 +220,7 @@ def check_once(odi, targets, state, reply=False):
     for target in targets:
         matches = [(n, a) for n, a in menus if target.lower() in n.lower()]
         if not matches:
-            lines.append(f"❔ {target}: listede bulunamadı")
+            lines.append(f"💤 {target}: şu an Odi'de listelenmiyor (kapalı olabilir)")
             continue
         avail = any(a for _, a in matches)
         current[target] = avail
@@ -225,6 +241,7 @@ def check_once(odi, targets, state, reply=False):
 
 
 def main():
+    wait_for_start()
     end = window_end()
     if end is None:
         print("Çalışma saatleri dışında, çıkılıyor.")
