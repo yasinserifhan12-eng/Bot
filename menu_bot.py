@@ -15,6 +15,7 @@ import html
 import os
 import re
 import sys
+import time
 import urllib.parse
 import urllib.request
 from datetime import datetime
@@ -159,7 +160,22 @@ def send(text):
     urllib.request.urlopen(f"https://api.telegram.org/bot{token}/sendMessage", data=data, timeout=20)
 
 
+def wait_until_send_time():
+    """Zamanlanmış çalıştırma erken başladıysa MENU_SEND_AT saatine (ör. 09:00) kadar bekler."""
+    target = env("MENU_SEND_AT")
+    if not target or env("DRY_RUN") == "1":
+        return
+    now = datetime.now(TZ)
+    h, m = (int(x) for x in target.split(":"))
+    at = now.replace(hour=h, minute=m, second=0, microsecond=0)
+    wait = (at - now).total_seconds()
+    if 0 < wait <= 60 * 60:
+        print(f"{target} bekleniyor ({int(wait)} sn)...")
+        time.sleep(wait)
+
+
 def main():
+    wait_until_send_time()
     date = datetime.now(TZ)
     if env("MENU_DATE"):  # test için: YYYY-MM-DD
         date = datetime.strptime(env("MENU_DATE"), "%Y-%m-%d").replace(tzinfo=TZ)
