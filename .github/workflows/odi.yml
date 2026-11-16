@@ -5,8 +5,10 @@ name: Odi askida yemek takibi
 # bir iş zaten çalışıyorsa yenisi sırada bekler, iş biterse/çökerse devralır.
 on:
   schedule:
-    # UTC 08:00-17:55 = Türkiye saatiyle 11:00-20:55
-    - cron: "*/5 8-17 * * *"
+    # GitHub zamanlamayı geciktirebildiği için 10:15'ten itibaren denenir;
+    # erken başlayan iş 11:00'ı bekler, böylece bot 11:00'de hazır olur.
+    - cron: "15-55/5 7 * * *"   # UTC 07:15-07:55 = TR 10:15-10:55
+    - cron: "*/5 8-17 * * *"    # UTC 08:00-17:55 = TR 11:00-20:55
   workflow_dispatch: {}   # "Run workflow" ile elle test (10 dk çalışır)
 
 concurrency:
