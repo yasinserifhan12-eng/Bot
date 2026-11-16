@@ -1,27 +1,62 @@
 name: Yemekhane gunluk menu
 
+# GitHub zamanlanmış işleri geç başlatabiliyor ya da atlayabiliyor.
+# Bu yüzden 08:15-09:55 (Türkiye saati) arasında her 5 dakikada bir denenir:
+#  - 09:00'dan önce başlayan iş 09:00'a kadar bekler, sonra gönderir.
+#  - 09:00'dan sonra başlayan iş hemen gönderir.
+#  - O gün zaten gönderildiyse sonraki denemeler hiçbir şey yapmadan biter.
 on:
   schedule:
-    # UTC 05:50 = Türkiye saatiyle 08:50. GitHub zamanlaması birkaç dakika
-    # gecikebildiği için 09:00 yerine biraz erken ayarlandı.
-    - cron: "50 5 * * *"
-  workflow_dispatch: {}   # "Run workflow" ile elle test
+    - cron: "15-55/5 5 * * *"   # UTC 05:15-05:55 = TR 08:15-08:55
+    - cron: "*/5 6 * * *"       # UTC 06:00-06:55 = TR 09:00-09:55
+  workflow_dispatch: {}          # "Run workflow": beklemeden, her zaman gönderir
+
+concurrency:
+  group: menu-bot
+  cancel-in-progress: false
 
 jobs:
   menu:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 60
     steps:
+      - name: Bugünün tarihi
+        id: day
+        run: echo "date=$(TZ=Europe/Istanbul date +%F)" >> "$GITHUB_OUTPUT"
+
+      # Bugün gönderildiyse bu işaret önbellekte bulunur.
+      - uses: actions/cache/restore@v4
+        id: sent
+        with:
+          path: .menu-sent
+          key: menu-sent-${{ steps.day.outputs.date }}
+          lookup-only: true
+
       - uses: actions/checkout@v4
+        if: github.event_name == 'workflow_dispatch' || steps.sent.outputs.cache-hit != 'true'
 
       - uses: actions/setup-python@v5
+        if: github.event_name == 'workflow_dispatch' || steps.sent.outputs.cache-hit != 'true'
         with:
           python-version: "3.12"
 
       - name: Menüyü gönder
+        id: send
+        if: github.event_name == 'workflow_dispatch' || steps.sent.outputs.cache-hit != 'true'
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           MENU_LOCATION_ID: ${{ vars.MENU_LOCATION_ID }}
           MENU_MEALS: ${{ vars.MENU_MEALS }}
+          MENU_SEND_AT: ${{ github.event_name == 'schedule' && '09:00' || '' }}
         run: python -u menu_bot.py
+
+      - name: Gönderildi işaretini hazırla
+        if: steps.send.outcome == 'success' && steps.sent.outputs.cache-hit != 'true'
+        run: mkdir -p .menu-sent && date > .menu-sent/ok
+
+      - uses: actions/cache/save@v4
+        if: steps.send.outcome == 'success' && steps.sent.outputs.cache-hit != 'true'
+        with:
+          path: .menu-sent
+          key: menu-sent-${{ steps.day.outputs.date }}
